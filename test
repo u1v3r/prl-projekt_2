@@ -1,0 +1,31 @@
+#!/bin/bash
+
+log(){ 
+	local x=$1 n=2 l=-1;
+	if [ "$2" != "" ];
+		then n=$x;x=$2;
+	fi;
+	while((x));
+	do 
+		let l+=1 x/=n;
+	done;
+
+	echo "$l"; 
+}
+
+
+if [ $# -lt 1 ];then 					#pocet cisel bud zadam nebo 10 :)
+    numbers=10;
+else
+    numbers=$1;
+fi;
+
+PROCS=$(log $numbers);
+
+#mpicc --prefix /usr/local/share/OpenMPI -o pms pms.c				#preklad zdrojaku
+mpicc -o pms pms.c					#preklad zdrojaku
+dd if=/dev/random bs=1 count=$numbers of=numbers	#vyrobeni souboru s random cisly
+mpirun -np $((PROCS+1)) pms -n $numbers			#spusteni
+rm -f pms numbers					#uklid
+
+
