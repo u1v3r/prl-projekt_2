@@ -1,5 +1,5 @@
 #include "pms.h"
-//#define DEBUG 1
+#define DEBUG 1
 
 int main(int argc, char *argv[]){
 
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]){
     int flag_shift_up = 0;
     int flag_shift_down = 0;
 
-    for(i = 0; i < 25; i++){
+    for(i = 0; i < cycle_end; i++){
 
         /* prvy procesor cita zo suboru cisla */
         if(myid == 0){
@@ -124,6 +124,8 @@ int main(int argc, char *argv[]){
                 flag_end = 1;
             }
 
+            // ak by mal porovnavat za hranicou tak skonci
+            if(compare_up == numprocs && compare_down == numprocs) break;
 
             /* na druhom procesore sa prepina flag po jednom porovnani
              * na tretom po dvoch porovnaniach...atd.
@@ -132,40 +134,21 @@ int main(int argc, char *argv[]){
             //printf("%i - conter = %i, pow = %i\n",myid+1,counter,power);
             if(counter == power){
                 #ifdef DEBUG
-                printf("%i - menim flag na hodnote %i\n",myid + 1, power);
+                printf("%i - menim flag na hodnote counter:%i == power:%i\n",myid + 1, counter,power);
                 #endif
                 flag_change = 1;
                 counter = 0;
             }
 
-
-
-            //printf("\n\n%d - sum:%d == myid:%d\n\n",myid+1,changed_up+changed_down,myid);
-
-
-                q_size = pow(2,((myid + 1) - 2));
-                /* velkost fronty, ktora udava kedy ma dany procesor zacat porovanvat */
-                if(q_size == count_up) flag_start = 1;
-
-                #ifdef DEBUG
-                //printf("%d - velkost %i v cykle %d s cislom %d\n",myid,q_size,i,number);
-                //printf("%d - porovnavam size:%i == count_up:%i\n",myid+1,pow(2,((myid + 1) - 2)),count_up);
-                //printf("%d - porovnavam size:%i == count_down:%i\n",myid+1,pow(2,((myid + 1) - 2)),count_down);
-                #endif
-
-                /* velkost hornej fronty dosiahla pozadovanu velkost a na dolnej je aspon
-                 * jedna hodnota
-                 */
-                if(flag_start == 1 && count_down >= 1){
-
-                        /* postupnost bola zoradena nastav indexy compare_down a compare_up */
-                        if(flag_change == 1){
+            /* postupnost bola zoradena nastav indexy compare_down a compare_up na novy index*/
+            if(flag_change == 1){
 
                             if(changed_up == 1) {
                                 #ifdef DEBUG
                                 printf("%d - posielam zostavajucu down hodnotu %i na indexe %i\n",
                                        myid+1,down[myid][compare_down],compare_down);
                                 #endif
+
                                 if(myid == (numprocs - 1)){
                                     printf("1 - %d\n",down[myid][compare_down]);
                                 }else {
@@ -173,6 +156,8 @@ int main(int argc, char *argv[]){
                                 }
                                 compare_down = compare_up;
                                 changed_up = 0;
+                                changed_down = 0;
+                                count_down--;
                             }
 
                             if(changed_down == 1){
@@ -186,17 +171,24 @@ int main(int argc, char *argv[]){
                                     MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                                 }
                                 compare_up = compare_down;
+                                changed_up = 0;
                                 changed_down = 0;
+                                count_up--;
                             }
 
                             flag_change = 0;
 
-                        }else {
+                }
+
+
+                if(compare_down != 0 && compare_up != 0){
 
                             if((compare_up - compare_down == 0) && flag_shift_down == 1 ) {
+                                printf("v sifte down\n");
                                 flag_shift_down = 0;
                             }
                             if((compare_down - compare_up == 0) && flag_shift_up == 1) {
+                                printf("v sifte up\n");
                                 flag_shift_up = 0;
                             }
 
@@ -213,8 +205,8 @@ int main(int argc, char *argv[]){
                                 }
 
                                 flag_shift_down = 1;
-                                compare_down++;
                                 counter++;
+                                count_down--;
                             } else if((compare_down - compare_up == q_size) || flag_shift_up == 1){
                                 #ifdef DEBUG
                                 printf("%i - Vysuvam up hodnotu %i\n",myid+1,up[myid][compare_up]);
@@ -225,9 +217,28 @@ int main(int argc, char *argv[]){
                                     MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                                 }
                                 flag_shift_up = 1;
-                                compare_up++;
                                 counter++;
-                            }else{
+                                count_up--;
+                            }
+                }
+
+
+
+
+                q_size = pow(2,((myid + 1) - 2));
+                /* velkost fronty, ktora udava kedy ma dany procesor zacat porovanvat */
+                if(q_size == count_up) flag_start = 1;
+
+                #ifdef DEBUG
+                //printf("%d - velkost %i v cykle %d s cislom %d\n",myid,q_size,i,number);
+                printf("%d - porovnavam size:%i == count_up:%i\n",myid+1,q_size,count_up);
+                printf("%d - porovnavam size:%i == count_down:%i\n",myid+1,q_size,count_down);
+                #endif
+
+                /* velkost hornej fronty dosiahla pozadovanu velkost a na dolnej je aspon
+                 * jedna hodnota
+                 */
+                if(flag_start == 1 && count_down >= 1 && flag_shift_down == 0 && flag_shift_up == 0){
 
                                 #ifdef DEBUG
                                 printf("UP - procesor c. %d zacal porovnavat v kroku %d cisla %i:%i a %i:%i\n",
@@ -240,7 +251,7 @@ int main(int argc, char *argv[]){
 
                                         /* dalsiemu procesoru posli cislo z up */
                                         #ifdef DEBUG
-                                        printf("%d - na %i. procesor posielam cislo %i\n",myid+1,myid+2,up[myid][compare_up]);
+                                        printf("%d - na %i. procesor posielam up cislo %i\n",myid+1,myid+2,up[myid][compare_up]);
                                         #endif
                                         if(myid == (numprocs - 1)){
                                             printf("5 - %d\n",up[myid][compare_up]);
@@ -266,7 +277,7 @@ int main(int argc, char *argv[]){
 
                                         /* dalsiemu procesoru posli cislo z down */
                                         #ifdef DEBUG
-                                        printf("%d - na %i. procesor posielam cislo %i\n",myid+1,myid+2,down[myid][compare_down]);
+                                        printf("%d - na %i. procesor posielam down cislo %i\n",myid+1,myid+2,down[myid][compare_down]);
                                         #endif
                                         if(myid == (numprocs - 1)){
                                             printf("6 - %d\n",down[myid][compare_down]);
@@ -287,9 +298,6 @@ int main(int argc, char *argv[]){
                                         /* v nasledujucom kroku bude porovnavat s dalsim down v poradi */
                                         compare_down++;
                                 }
-                            }
-
-                        }
 
 
                 }
@@ -307,6 +315,7 @@ int main(int argc, char *argv[]){
 
                 k = 0;
             }
+            if(flag_end == 1) printf("%i - je nastaveny flag_end\n",myid+1);
 
             if(flag_end == 0){
                 if(save_up == 1){
