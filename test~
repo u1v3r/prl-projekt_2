@@ -15,5 +15,5 @@ ROUNDED=$(round $PROCS);
 #mpicc --prefix /usr/local/share/OpenMPI -o pms pms.c >/dev/null 2>&1		 #preklad zdrojaku
 mpicc -o pms pms.c >/dev/null 2>&1				 #preklad zdrojaku
 dd if=/dev/random bs=1 count=$numbers of=numbers >/dev/null 2>&1 #vyrobeni souboru s random cisly
-mpirun -np $(($ROUNDED+1)) pms -n $numbers 	 		 #spusteni
+mpirun -np $(($ROUNDED+1)) pms -n $numbers 	 #spusteni
 rm -f pms numbers						 #uklid

@@ -1,5 +1,5 @@
 #include "pms.h"
-#define DEBUG 1
+//#define DEBUG 1
 //#define TEXT_INPUT 1
 
 int main(int argc, char *argv[]){
@@ -120,9 +120,6 @@ int main(int argc, char *argv[]){
             if(recv != numbers_count){
                 MPI_Recv(&number, 1, MPI_INT, (myid - 1), TAG, MPI_COMM_WORLD, &stat);
                 recv++;
-                if(myid == (numprocs - 1)){
-                    printf("%i\n",number);
-                }
             }else {
                 flag_end = 1;
             }
@@ -156,7 +153,7 @@ int main(int argc, char *argv[]){
                                 #endif
 
                                 if(myid == (numprocs - 1)){
-                                    printf("%i - %d\n",i,down[myid][compare_down]);
+                                    printf("%d\n",down[myid][compare_down]);
                                 }else {
                                     MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                                 }
@@ -172,7 +169,7 @@ int main(int argc, char *argv[]){
                                        myid+1,up[myid][compare_up],compare_up);
                                 #endif
                                 if(myid == (numprocs - 1)){
-                                    printf("%i - %d\n",i,up[myid][compare_up]);
+                                    printf("%d\n",up[myid][compare_up]);
                                 } else {
                                     MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                                 }
@@ -197,13 +194,13 @@ int main(int argc, char *argv[]){
 
 
                     /* hodnoty su v hornej fronte */
-                    if(count_up > 1){
+                    if(count_up > 1 && (compare_down % q_size == 0)){
                         #ifdef DEBUG
                         printf("%i - Vysuvam up hodnotu %i compare_up:%i, counter:%i, cyklus:%i\n",myid+1,up[myid][compare_up],compare_up,counter,i);
                         #endif
 
                         if(myid == (numprocs - 1)){
-                            printf("%i - %d\n",i,up[myid][compare_up]);
+                            printf("%d\n",up[myid][compare_up]);
                         }else {
                             MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                         }
@@ -215,13 +212,13 @@ int main(int argc, char *argv[]){
                     }
 
                     /* hodnoty su v dolnej fronte */
-                    if(count_down > 1){
+                    if(count_down > 1 && (compare_up % q_size == 0)){
                         #ifdef DEBUG
                         printf("%i - Vysuvam down hodnotu %i compare_down:%i, counter:%i, cyklus:%i\n",myid+1,down[myid][compare_down],compare_down,counter,i);
                         #endif
 
                         if(myid == (numprocs - 1)){
-                            printf("%i - %d\n",i,down[myid][compare_down]);
+                            printf("%d\n",down[myid][compare_down]);
                         } else {
                             MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                         }
@@ -265,7 +262,7 @@ int main(int argc, char *argv[]){
                                         printf("%d - na %i. procesor posielam up cislo %i\n",myid+1,myid+2,up[myid][compare_up]);
                                         #endif
                                         if(myid == (numprocs - 1)){
-                                            printf("%i - %d\n",i,up[myid][compare_up]);
+                                            printf("%d\n",up[myid][compare_up]);
                                         }
                                         else {
                                             MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
@@ -291,7 +288,7 @@ int main(int argc, char *argv[]){
                                         printf("%d - na %i. procesor posielam down cislo %i\n",myid+1,myid+2,down[myid][compare_down]);
                                         #endif
                                         if(myid == (numprocs - 1)){
-                                            printf("%i - %d\n",i,down[myid][compare_down]);
+                                            printf("%d\n",down[myid][compare_down]);
                                         }
                                         else {
                                             MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
