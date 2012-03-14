@@ -1,5 +1,6 @@
 #include "pms.h"
 #define DEBUG 1
+//#define TEXT_INPUT 1
 
 int main(int argc, char *argv[]){
 
@@ -26,23 +27,6 @@ int main(int argc, char *argv[]){
     MPI_Comm_size(MPI_COMM_WORLD, &numprocs);       /* zisti kolko procesov bezi */
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);           /* zisti id svojho procesu */
 
-    /* alokacia pamate pre cisla na vstupe */
-    numbers = (int *)malloc(INIT_NUMBERS_SIZE * sizeof(int));
-
-    /* alokacia pamete pre vsetky procesory */
-    up = (int *) malloc(numprocs * sizeof(int));
-    down = (int *) malloc(numprocs * sizeof(int));
-
-
-    /*
-     * alokacia pamate vo frontach pre cisla, zacina na druhom procesore
-     * s hodnotou pre dve cisla pre kazdu frontu
-     */
-    for(i = 1; i < numprocs; i++){
-            up[i] = (int *) malloc(numprocs * sizeof(int));
-            down[i] = (int *) malloc(numprocs * sizeof(int));
-    }
-
     /* z paremetru ziskaj pocet spracovavanych cisiel */
     while((opt = getopt(argc, argv, "n:")) != -1) {
             if(opt == 'n'){
@@ -50,19 +34,44 @@ int main(int argc, char *argv[]){
             }
     }
 
+    /* alokacia pamete pre vsetky procesory */
+    up = malloc(numprocs * sizeof(int *));
+    down = malloc(numprocs * sizeof(int *));
+
+    /*
+     * alokacia pamate vo frontach pre cisla, zacina na druhom procesore
+     * s hodnotou pre dve cisla pre kazdu frontu
+     */
+    for(i = 1; i < numprocs; i++){
+            up[i] = malloc((numbers_count/2) * sizeof(int));
+            down[i] = malloc((numbers_count/2) * sizeof(int));
+    }
+
+    /* alokacia pamate pre cisla na vstupe */
+    numbers = malloc(numbers_count * sizeof(int));
+
     /* udava pocet cyklov po ktorych musi byt zoradene */
     int cycle_end = (numbers_count - 1) + pow(2,numprocs - 1) + (numprocs - 1);
 
     /* prvy procesor si otvori subor na citanie */
     if(myid == 0){
+        #ifdef TEXT_INPUT
+        if((handler = fopen("test_numbers.txt","r")) == NULL){
+            fprintf(stderr,"Open file failed!" );
+            exit(EXIT_FAILURE);
+         }
+        #else
         if((handler = fopen(FILENAME,"r")) == NULL){
             fprintf(stderr,"Open file failed!" );
             exit(EXIT_FAILURE);
          }
+        #endif
+
+
     }
 
-    /* urcuje index pola porovnavanych hodnot */
-    int compare_index = 0;
+
+    int compare_index = 0;  /* urcuje index pola porovnavanych hodnot */
     int index_up = 0;
     int index_down = 0;
     int save_up = 1;
@@ -73,8 +82,7 @@ int main(int argc, char *argv[]){
     int flag_start = 0;
     int flag_change = 0;
     int counter = 0;
-    int flag_shift_up = 0;
-    int flag_shift_down = 0;
+    int flag_shift = 0;
 
     for(i = 0; i < cycle_end; i++){
 
@@ -86,12 +94,7 @@ int main(int argc, char *argv[]){
                 /* postupne citaj subor, az kym nenarazi na koniec */
                 if((number = getc(handler)) != EOF){
 
-                    /* ak je treba alokuj viac pamate */
-                    if(i % INIT_NUMBERS_SIZE == 0 && i != 0){
-                        numbers = realloc(numbers,(i + INIT_NUMBERS_SIZE) * sizeof(int));
-                    }
-
-                    /* postupne posielaj na frontu nasledujucemu procesoru */
+                     /* postupne posielaj na frontu nasledujucemu procesoru */
                     MPI_Send(&number, 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                     numbers[i] = number;
                 }else{
@@ -116,21 +119,24 @@ int main(int argc, char *argv[]){
             /* ak prijal vsetky cisla tak uz necakaj na dalsie a ak je koniec nastav flag_end */
             if(recv != numbers_count){
                 MPI_Recv(&number, 1, MPI_INT, (myid - 1), TAG, MPI_COMM_WORLD, &stat);
-                /*if(myid == 2){
-                    printf("prijal som %d\n",number);
-                }*/
                 recv++;
+                if(myid == (numprocs - 1)){
+                    printf("%i\n",number);
+                }
             }else {
                 flag_end = 1;
             }
 
-            // ak by mal porovnavat za hranicou tak skonci
-            if(compare_up == numprocs && compare_down == numprocs) break;
+
+            /* velkost fronty pre porovnavanie */
+            q_size = pow(2,((myid + 1) - 2));
+
 
             /* na druhom procesore sa prepina flag po jednom porovnani
              * na tretom po dvoch porovnaniach...atd.
              */
             int power = pow(2,myid) - 1;
+
             //printf("%i - conter = %i, pow = %i\n",myid+1,counter,power);
             if(counter == power){
                 #ifdef DEBUG
@@ -150,7 +156,7 @@ int main(int argc, char *argv[]){
                                 #endif
 
                                 if(myid == (numprocs - 1)){
-                                    printf("1 - %d\n",down[myid][compare_down]);
+                                    printf("%i - %d\n",i,down[myid][compare_down]);
                                 }else {
                                     MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                                 }
@@ -166,7 +172,7 @@ int main(int argc, char *argv[]){
                                        myid+1,up[myid][compare_up],compare_up);
                                 #endif
                                 if(myid == (numprocs - 1)){
-                                    printf("2 - %d\n",up[myid][compare_up]);
+                                    printf("%i - %d\n",i,up[myid][compare_up]);
                                 } else {
                                     MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                                 }
@@ -176,69 +182,74 @@ int main(int argc, char *argv[]){
                                 count_up--;
                             }
 
+                            flag_start = 0;
                             flag_change = 0;
+                            flag_shift = 0;
+                    }
 
+
+                /* pocet zamenenych hodnot sa rovna q_size, ale na niektorej
+                 * fronte stale zostava viac ako 1 hodnota
+                 */
+                if((((compare_up % q_size == 0) && count_down > 1) ||
+                   ((compare_down % q_size == 0) && count_up > 1)) &&
+                     counter >= q_size){
+
+
+                    /* hodnoty su v hornej fronte */
+                    if(count_up > 1){
+                        #ifdef DEBUG
+                        printf("%i - Vysuvam up hodnotu %i compare_up:%i, counter:%i, cyklus:%i\n",myid+1,up[myid][compare_up],compare_up,counter,i);
+                        #endif
+
+                        if(myid == (numprocs - 1)){
+                            printf("%i - %d\n",i,up[myid][compare_up]);
+                        }else {
+                            MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
+                        }
+
+                        counter++;
+                        count_up--;
+                        compare_up++;
+                        flag_shift = 1;
+                    }
+
+                    /* hodnoty su v dolnej fronte */
+                    if(count_down > 1){
+                        #ifdef DEBUG
+                        printf("%i - Vysuvam down hodnotu %i compare_down:%i, counter:%i, cyklus:%i\n",myid+1,down[myid][compare_down],compare_down,counter,i);
+                        #endif
+
+                        if(myid == (numprocs - 1)){
+                            printf("%i - %d\n",i,down[myid][compare_down]);
+                        } else {
+                            MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
+                        }
+
+                        counter++;
+                        count_down--;
+                        compare_down++;
+                        flag_shift = 1;
+
+                    }
                 }
 
 
-                if(compare_down != 0 && compare_up != 0){
-
-                            if((compare_up - compare_down == 0) && flag_shift_down == 1 ) {
-                                printf("v sifte down\n");
-                                flag_shift_down = 0;
-                            }
-                            if((compare_down - compare_up == 0) && flag_shift_up == 1) {
-                                printf("v sifte up\n");
-                                flag_shift_up = 0;
-                            }
-
-                            /* ide na index, ktory je za hranicou, tak len vysun hodnoty */
-                            if( (compare_up - compare_down == q_size) || flag_shift_down == 1){
-                                #ifdef DEBUG
-                                printf("%i - Vysuvam down hodnotu %i\n",myid+1,down[myid][compare_down]);
-                                #endif
-
-                                if(myid == (numprocs - 1)){
-                                    printf("3 - %d\n",down[myid][compare_down]);
-                                } else {
-                                    MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
-                                }
-
-                                flag_shift_down = 1;
-                                counter++;
-                                count_down--;
-                            } else if((compare_down - compare_up == q_size) || flag_shift_up == 1){
-                                #ifdef DEBUG
-                                printf("%i - Vysuvam up hodnotu %i\n",myid+1,up[myid][compare_up]);
-                                #endif
-                                if(myid == (numprocs - 1)){
-                                    printf("4 - %d\n",up[myid][compare_up]);
-                                }else {
-                                    MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
-                                }
-                                flag_shift_up = 1;
-                                counter++;
-                                count_up--;
-                            }
-                }
 
 
 
-
-                q_size = pow(2,((myid + 1) - 2));
                 /* velkost fronty, ktora udava kedy ma dany procesor zacat porovanvat */
                 if(q_size == count_up) flag_start = 1;
 
                 #ifdef DEBUG
-                //printf("%d - velkost %i v cykle %d s cislom %d\n",myid,q_size,i,number);
-                printf("%d - porovnavam size:%i == count_up:%i\n",myid+1,q_size,count_up);
-                printf("%d - porovnavam size:%i == count_down:%i\n",myid+1,q_size,count_down);
+                printf("%d - porovnavam size:%i == count_up:%i - %i\n",myid+1,q_size,count_up,i);
+                printf("%d - porovnavam size:%i == count_down:%i - %i\n",myid+1,q_size,count_down,i);
                 #endif
 
                 /* velkost hornej fronty dosiahla pozadovanu velkost a na dolnej je aspon
                  * jedna hodnota
                  */
-                if(flag_start == 1 && count_down >= 1 && flag_shift_down == 0 && flag_shift_up == 0){
+                if(flag_start == 1 && count_down >= 1 && flag_shift == 0){
 
                                 #ifdef DEBUG
                                 printf("UP - procesor c. %d zacal porovnavat v kroku %d cisla %i:%i a %i:%i\n",
@@ -254,7 +265,7 @@ int main(int argc, char *argv[]){
                                         printf("%d - na %i. procesor posielam up cislo %i\n",myid+1,myid+2,up[myid][compare_up]);
                                         #endif
                                         if(myid == (numprocs - 1)){
-                                            printf("5 - %d\n",up[myid][compare_up]);
+                                            printf("%i - %d\n",i,up[myid][compare_up]);
                                         }
                                         else {
                                             MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
@@ -280,7 +291,7 @@ int main(int argc, char *argv[]){
                                         printf("%d - na %i. procesor posielam down cislo %i\n",myid+1,myid+2,down[myid][compare_down]);
                                         #endif
                                         if(myid == (numprocs - 1)){
-                                            printf("6 - %d\n",down[myid][compare_down]);
+                                            printf("%i - %d\n",i,down[myid][compare_down]);
                                         }
                                         else {
                                             MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
@@ -303,6 +314,7 @@ int main(int argc, char *argv[]){
                 }
 
 
+
             /* striedavo ukladaj na fronty pricom kazda fronta ma veklost
              * 2^i-2
              */
@@ -315,7 +327,10 @@ int main(int argc, char *argv[]){
 
                 k = 0;
             }
+
+            #ifdef DEBUG
             if(flag_end == 1) printf("%i - je nastaveny flag_end\n",myid+1);
+            #endif
 
             if(flag_end == 0){
                 if(save_up == 1){
@@ -337,7 +352,7 @@ int main(int argc, char *argv[]){
     }
 
     #ifdef DEBUG
-    printf("\n\n\nKoniec %d\n\n\n",myid+1);
+    printf("\n\n\nKoniec %d - %i\n\n\n",myid+1,i);
     #endif
 
     MPI_Finalize();

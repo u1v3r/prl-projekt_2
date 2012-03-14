@@ -9,7 +9,7 @@
 
 #define FILENAME "numbers"
 #define TAG 0
-#define INIT_NUMBERS_SIZE 50    /* pocet cisel pre ktore bude inicializovana pamat */
+#define INIT_NUMBERS_SIZE 64    /* pocet cisel pre ktore bude inicializovana pamat */
 
 void print_numbers(int *numbers,int length);
 
