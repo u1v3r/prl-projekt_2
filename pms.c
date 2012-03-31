@@ -1,6 +1,9 @@
 #include "pms.h"
+#include <sys/time.h>
+#include <unistd.h>
 //#define DEBUG 1
 //#define TEXT_INPUT 1
+#define TEST 1
 
 int main(int argc, char *argv[]){
 
@@ -21,6 +24,14 @@ int main(int argc, char *argv[]){
     int changed_up = 0;         /* nastavene na 1 ak sa odoslala up hodnota */
     int changed_down = 0;       /* nastavene na 1 ak sa odoslala down hodnota */
     int recv = 0;
+
+    #ifdef TEST
+    struct timeval start_time, end_time;
+    long mtime, seconds, useconds;
+
+    gettimeofday(&start_time, NULL);
+
+    #endif
 
     /* MPI INIT */
     MPI_Init(&argc,&argv);                          /* inicializacia MPI */
@@ -107,7 +118,9 @@ int main(int argc, char *argv[]){
 
             /* na konci citania vypis cisla a uzatvor subor */
             if(i == numbers_count){
+                #ifndef TEST
                 print_numbers(numbers,numbers_count);
+                #endif
                 fclose(handler);
             }
 
@@ -153,7 +166,9 @@ int main(int argc, char *argv[]){
                                 #endif
 
                                 if(myid == (numprocs - 1)){
+                                    #ifndef TEST
                                     printf("%d\n",down[myid][compare_down]);
+                                    #endif
                                 }else {
                                     MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                                 }
@@ -169,7 +184,9 @@ int main(int argc, char *argv[]){
                                        myid+1,up[myid][compare_up],compare_up);
                                 #endif
                                 if(myid == (numprocs - 1)){
+                                    #ifndef TEST
                                     printf("%d\n",up[myid][compare_up]);
+                                    #endif
                                 } else {
                                     MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                                 }
@@ -200,7 +217,9 @@ int main(int argc, char *argv[]){
                         #endif
 
                         if(myid == (numprocs - 1)){
+                            #ifndef TEST
                             printf("%d\n",up[myid][compare_up]);
+                            #endif
                         }else {
                             MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                         }
@@ -218,7 +237,9 @@ int main(int argc, char *argv[]){
                         #endif
 
                         if(myid == (numprocs - 1)){
+                            #ifndef TEST
                             printf("%d\n",down[myid][compare_down]);
+                            #endif
                         } else {
                             MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
                         }
@@ -230,9 +251,6 @@ int main(int argc, char *argv[]){
 
                     }
                 }
-
-
-
 
 
                 /* velkost fronty, ktora udava kedy ma dany procesor zacat porovanvat */
@@ -262,7 +280,9 @@ int main(int argc, char *argv[]){
                                         printf("%d - na %i. procesor posielam up cislo %i\n",myid+1,myid+2,up[myid][compare_up]);
                                         #endif
                                         if(myid == (numprocs - 1)){
+                                            #ifndef TEST
                                             printf("%d\n",up[myid][compare_up]);
+                                            #endif
                                         }
                                         else {
                                             MPI_Send(&up[myid][compare_up], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
@@ -288,7 +308,9 @@ int main(int argc, char *argv[]){
                                         printf("%d - na %i. procesor posielam down cislo %i\n",myid+1,myid+2,down[myid][compare_down]);
                                         #endif
                                         if(myid == (numprocs - 1)){
+                                            #ifndef TEST
                                             printf("%d\n",down[myid][compare_down]);
+                                            #endif
                                         }
                                         else {
                                             MPI_Send(&down[myid][compare_down], 1, MPI_INT, (myid + 1), TAG, MPI_COMM_WORLD);
@@ -353,6 +375,20 @@ int main(int argc, char *argv[]){
     #endif
 
     MPI_Finalize();
+
+    #ifdef TEST
+    if(myid == 0){
+        gettimeofday(&end_time, NULL);
+
+        seconds  = end_time.tv_sec  - start_time.tv_sec;
+        useconds = end_time.tv_usec - start_time.tv_usec;
+
+        mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
+
+        printf("Elapsed time: %ld milliseconds\n", mtime);
+    }
+    #endif
+
     return 0;
 }
 

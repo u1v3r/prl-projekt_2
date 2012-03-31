@@ -3,8 +3,8 @@
 log(){ echo "l($1)/l(2)" | bc -l;}
 round(){ echo "($1+0.5)/1" | bc;}
 
-if [ $# -lt 1 ];then 					#pocet cisel bud zadam nebo 10 :)
-    numbers=10;
+if [ $# -lt 1 ];then
+    numbers=8;
 else
     numbers=$1;
 fi;
@@ -12,8 +12,9 @@ fi;
 PROCS=$(log $numbers);
 ROUNDED=$(round $PROCS);
 
-#mpicc --prefix /usr/local/share/OpenMPI -o pms pms.c >/dev/null 2>&1		 #preklad zdrojaku
-mpicc -o pms pms.c >/dev/null 2>&1				 #preklad zdrojaku
-dd if=/dev/random bs=1 count=$numbers of=numbers >/dev/null 2>&1 #vyrobeni souboru s random cisly
-mpirun -np $(($ROUNDED+1)) pms -n $numbers 	 		 #spusteni
+mpicc --prefix /usr/local/share/OpenMPI -o pms pms.c #>/dev/null 2>&1		 #preklad zdrojaku
+#mpicc -o pms pms.c #>/dev/null 2>&1				 #preklad zdrojaku
+dd if=/dev/urandom bs=1 count=$numbers of=numbers >/dev/null 2>&1 #vyrobeni souboru s random cisly
+#mpirun -np $(($ROUNDED+1)) pms -n $numbers
+mpirun --prefix /usr/local/share/OpenMPI -np $(($ROUNDED+1)) pms -n $numbers 	 		 #spusteni
 rm -f pms numbers						 #uklid
